@@ -2,7 +2,7 @@
  * @Author: Mei Zhang micpearl@163.com
  * @Date: 2023-05-06 01:45:22
  * @LastEditors: Mei Zhang micpearl@163.com
- * @LastEditTime: 2023-05-14 05:20:44
+ * @LastEditTime: 2023-05-14 06:46:45
  * @FilePath: \MY_OSC_SendReceive\public\sketch.js
  * @Description: 【PORT 9000】
  */
@@ -54,11 +54,10 @@ let lastStateChangeTime = 0; // 上一次状态切换的时间，单位为毫秒
 let transitionDuration = 2000; // 状态切换的最小持续时间，单位为毫秒
 
 //连接线特效
-let x1=posX[0], y1=posY[0]; // 点a的坐标
-const targetX = 60; // 点b的x坐标
-let targetY= (60, cvs_h - 200); // 点b的y坐标
-let t_line = 0; // 参数t用于控制特效动画
-let isAnimating = true; // 控制特效动画的开关
+let mytimer = 0;
+let interval = 100;
+let redrawFlag = true;
+let c1x, c2x, c1y, c2y;
 
 function setup() {
 
@@ -71,8 +70,6 @@ function setup() {
   background(150);
   noStroke();
 
-  fill(0);
-  text("Send OSC", 10, 20);
 
 
 
@@ -83,8 +80,6 @@ function setup() {
   canvas2.background(254, 255, 208);//RGB
   //canvas2.background(220);//RGB
 
-  canvas2.fill(0);
-  canvas2.text("Recieve OSC", 10, 20);
 
   // 创建图像缓冲区，大小与canvas2相同
   brushBuffer = createGraphics(cvs_w, cvs_h);
@@ -105,24 +100,15 @@ function draw() {
   rect(55, cvs_h - 205, 150, 150); // 左下角正方形
   cubeEmo(60, cvs_h - 200, frameCount);//参数是正方形的位置坐标
 
+  checkLine();
   rippleEffect();
 
-  //checkLine();
-
-  // 更新参数t_line，控制特效动画
-  // 更新参数t，控制特效动画
-  if (isAnimating) {
-    t_line += 0.02;
-  }
-  
-
-  // 进行连接两点的特效绘制
-  drawFancyConnection(x1, y1, targetX, targetY, t_line);
-
-
-
   // 在第二个画布上绘制内容
-  brushEffect();
+  brushEffect(prevMouseX, prevMouseY, recievedMouseX, recievedMouseY, "Green");
+  brushEffect(prevMouseX, prevMouseY + 30, recievedMouseX, recievedMouseY + 30, "Autumn");
+  brushEffect(2*prevMouseX + cos(random(2,10)), cvs_h - prevMouseY + sin(random(2,10)), 2*recievedMouseX, cvs_h - recievedMouseY, "Spring");
+  brushEffect(3*prevMouseX + sin(random(2,10)), 3*prevMouseY + cos(random(2,10)), 3*cvs_w - recievedMouseX, 3*recievedMouseY, "Summer");
+
 
 
   // 将第二个画布绘制到主画布上
@@ -133,59 +119,34 @@ function draw() {
 function checkLine() {
   for (let i = 0; i < 7; i++) {
     if (checkPoint[i + 1] === true) {
-      drawConnectingLine(posX[i], posY[i]);
-
-      //stroke(47,82,71);
-      //strokeWeight(5);
-      //line(posX[i], posY[i], 60, cvs_h - 200);
+      drawBezier(posX[i], posY[i] - 2, 60 + i * 2, cvs_h - 200);
     }
   }
 }
-function drawConnectingLine(x1, y1) {
-  const targetX = 60; // 点b的x坐标
-  let targetY = cvs_h - 200; // 点b的y坐标 
-  // (60, cvs_h - 200)
-  //t_line
-  // 更新参数t_line，控制特效动画
-  t_line += 0.02;
-
-  // 进行连接两点的特效绘制
-  drawFancyConnection(x1, y1, targetX, targetY, t_line);
-
-  // 绘制点a
-  drawPoint(x1, y1);
-
-  // 绘制点b
-  drawPoint(targetX, targetY);
-
-
-}
-
-// 连接两点的特效绘制函数
-function drawFancyConnection(x1, y1, x2, y2, t) {
-  const numSegments = 100; // 分段数量
-  const segmentLength = dist(x1, y1, x2, y2) / numSegments; // 每个分段的长度
-
+function drawBezier(x1, y1, x2, y2) {
+  push();
   noFill();
-  beginShape();
-  for (let i = 0; i <= numSegments; i++) {
-    const progress = i / numSegments; // 分段的进度
-
-    // 在每个分段上创建动态的控制点
-    const controlX = lerp(x1, x2, progress) + cos(t + progress * TWO_PI) * 50;
-    const controlY = lerp(y1, y2, progress) + sin(t + progress * TWO_PI) * 50;
-
-    // 添加特效，例如线条透明度和粗细的变化
-    const alpha = map(i, 0, numSegments, 255, 0);
-    const weight = map(i, 0, numSegments, 5, 1);
-
-    stroke(0, alpha);
-    strokeWeight(weight);
-
-    // 绘制连接线的顶点
-    vertex(controlX, controlY);
+  stroke(255, 255, 255);
+  strokeWeight(0.5);
+  // 检查是否已经过了3秒
+  if (millis() - mytimer > interval) {
+    // 重置计时器
+    mytimer = millis();
+    redrawFlag = true;
   }
-  endShape();
+  else {
+    redrawFlag = false;
+
+  }
+  if (redrawFlag) {
+    c1x = random(x1, x2);
+    c1y = random(y1, y2);
+    c2x = random(x1, x2);
+    c2y = random(y1, y2);
+  }
+  bezier(x1, y1, c1x, c1y, c2x, c2y, x2, y2);
+
+  pop();
 }
 
 
@@ -205,7 +166,7 @@ function vilocity(pX, pY, nX, nY) {
     return v;
   }
 }
-function brushEffect() {
+function brushEffect(px, py, nx, ny, hue) {
   // 清空缓冲区
   brushBuffer.clear();
 
@@ -216,7 +177,7 @@ function brushEffect() {
 
   // 设置画笔的颜色和透明度，根据z值来调整
   let a = map(recievedMouseZ, 0, 100, 0, 100);
-  let s = sizeCal(vilocity(prevMouseX, prevMouseY, recievedMouseX, recievedMouseY));
+  let s = sizeCal(vilocity(px, py, nx, ny));
   let brushWeight = map(s, 0, 1200, brushSize, brushSize + 25);
 
   if (s > 0 && s < 100) {
@@ -224,34 +185,81 @@ function brushEffect() {
   }
 
   //绘制笔刷
-  //brushBuffer.stroke(140, 160, 23, a);
-  canvas2.stroke(140, 160, 23, a);//(140,160,23)很好看的一个绿色
+  if (hue == "Green") {
+    canvas2.stroke(140, 160, 23, a);
+  }
+  else if (hue == "Spring") {
+    canvas2.stroke(205, 73, 40, a);
+  }
+  else if (hue == "Autumn") {
+    canvas2.stroke(161, 105, 22, a);
+  }
+  else if (hue == "Summer") {
+    canvas2.stroke(151,230,228, a);
+  }
+  else if (hue == "Winter") {
+    canvas2.stroke(7,7,50, a);
+  }
+  else if (hue == "Winter_plus") {
+    canvas2.stroke(83,83,95, a);
+  }
+
   canvas2.strokeWeight(brushSize);
   canvas2.strokeJoin(ROUND);
 
   //计算笔刷
   canvas2.beginShape();
-  canvas2.fill(fillCal("r"), fillCal("g"), fillCal("b"));
-  canvas2.curveVertex(prevMouseX + random(-randomOffset, randomOffset), prevMouseY + random(-randomOffset, randomOffset));
-  canvas2.curveVertex(prevMouseX + random(-randomOffset, randomOffset), prevMouseY + random(-randomOffset, randomOffset));
-  canvas2.curveVertex(recievedMouseX + random(-randomOffset, randomOffset), recievedMouseY + random(-randomOffset, randomOffset));
-  canvas2.curveVertex(recievedMouseX + random(-randomOffset, randomOffset), recievedMouseY + random(-randomOffset, randomOffset));
+  canvas2.fill(seasonExe(hue, "r"), seasonExe(hue, "g"), seasonExe(hue, "b"));
+  canvas2.curveVertex(px + random(-randomOffset, randomOffset), py + random(-randomOffset, randomOffset));
+  canvas2.curveVertex(px + random(-randomOffset, randomOffset), py + random(-randomOffset, randomOffset));
+  canvas2.curveVertex(nx + random(-randomOffset, randomOffset), ny + random(-randomOffset, randomOffset));
+  canvas2.curveVertex(nx + random(-randomOffset, randomOffset), ny + random(-randomOffset, randomOffset));
   canvas2.endShape();
-
-  // 绘制线条
-  //canvas2.line(prevMouseX, prevMouseY, recievedMouseX, recievedMouseY);
 
   // 还原绘制模式
   canvas2.blendMode(BLEND);
 
 }
 
-function fillCal(str) {
-  switch (str) {
-    case "r": return random(12, 117);
-    case "g": return random(100, 117);
-    case "b": return random(12, 30);
+
+function seasonExe(season, rgb) {
+
+  var results;
+  if (season == 'Spring') {
+    if (rgb == 'r') results = Math.floor(random(150, 255));
+    else if (rgb == 'g') results = Math.floor(random(90, 200));
+    else if (rgb == 'b') results = Math.floor(random(0, 120));
+
   }
+  else if (season == 'Summer') {
+    if (rgb == 'r') results = Math.floor(random(0, 170));
+    else if (rgb == 'g') results = Math.floor(random(130, 2000));
+    else if (rgb == 'b') results = Math.floor(random(150, 255));
+
+  }
+  else if (season == 'Autumn') {
+    if (rgb == 'r') results = Math.floor(random(150, 255));
+    else if (rgb == 'g') results = Math.floor(random(90, 200));
+    else if (rgb == 'b') results = Math.floor(random(0, 120));
+  }
+  else if (season == 'Winter') {
+    if (rgb == 'r') results = Math.floor(random(0, 50));
+    else if (rgb == 'g') results = Math.floor(random(0, 160));
+    else if (rgb == 'b') results = Math.floor(random(100, 200));
+  }
+  else if (season == 'Winter_plus') {
+    if (rgb == 'r') results = Math.floor(random(200, 255));
+    else if (rgb == 'g') results = Math.floor(random(200, 255));
+    else if (rgb == 'b') results = Math.floor(random(12, 30));
+
+  }
+  else if (season == 'Green') {
+    if (rgb == 'r') results = Math.floor(random(12, 117));
+    else if (rgb == 'g') results = Math.floor(random(100, 117));
+    else if (rgb == 'b') results = Math.floor(random(200, 255));
+
+  }
+  return results;
 }
 
 //在draw里调用，作为canvas 1（同时也是鼠标控制发送坐标的那个画布）的效果
