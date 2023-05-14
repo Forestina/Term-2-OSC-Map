@@ -2,7 +2,7 @@
  * @Author: Mei Zhang micpearl@163.com
  * @Date: 2023-05-06 01:45:22
  * @LastEditors: Mei Zhang micpearl@163.com
- * @LastEditTime: 2023-05-14 06:46:45
+ * @LastEditTime: 2023-05-14 13:53:33
  * @FilePath: \MY_OSC_SendReceive\public\sketch.js
  * @Description: 【PORT 9000】
  */
@@ -59,6 +59,11 @@ let interval = 100;
 let redrawFlag = true;
 let c1x, c2x, c1y, c2y;
 
+//star tail effect
+let stars = [];
+let dotRadius = 2; // 设置小白点的半径
+let dotAmount = 7; // 设置小白点的半径
+
 function setup() {
 
   colorMode(HSB, 360, 30, 50); // 降低饱和度和亮度的值
@@ -91,8 +96,9 @@ function setup() {
 function draw() {
   background(246, 21, 8);//HSB mode
   // 在第一个画布上绘制内容
-  frameRate(10);
+  //frameRate(10);
 
+  starTailEffect();
 
   fill(178, 72, 15); // 阴影
   rect(60, cvs_h - 200, 150, 150); // 左下角正方形
@@ -106,8 +112,9 @@ function draw() {
   // 在第二个画布上绘制内容
   brushEffect(prevMouseX, prevMouseY, recievedMouseX, recievedMouseY, "Green");
   brushEffect(prevMouseX, prevMouseY + 30, recievedMouseX, recievedMouseY + 30, "Autumn");
-  brushEffect(2*prevMouseX + cos(random(2,10)), cvs_h - prevMouseY + sin(random(2,10)), 2*recievedMouseX, cvs_h - recievedMouseY, "Spring");
-  brushEffect(3*prevMouseX + sin(random(2,10)), 3*prevMouseY + cos(random(2,10)), 3*cvs_w - recievedMouseX, 3*recievedMouseY, "Summer");
+  //brushEffect(2*prevMouseX + cos(random(2,10)), cvs_h - prevMouseY + sin(random(2,10)), 2*recievedMouseX, cvs_h - recievedMouseY, "Spring");
+  //brushEffect(3*prevMouseX + sin(random(2,10)), 3*prevMouseY + cos(random(2,10)), 3*cvs_w - recievedMouseX, 3*recievedMouseY, "Summer");
+
 
 
 
@@ -116,6 +123,30 @@ function draw() {
 
 
 }
+function starTailEffect() {
+
+  // 添加新的流星
+  if (frameCount % 30 === 0) { // 每隔30帧添加一个新流星
+    let starCluster = new StarCluster();
+    starCluster.addStars(3, 10); // 每个簇内包含3到10个流星
+    stars.push(starCluster);
+  }
+
+  // 更新流星的位置并绘制
+  for (let i = stars.length - 1; i >= 0; i--) { // 逆序遍历，以便在移除元素时不会影响索引
+    let starCluster = stars[i];
+    starCluster.update();
+    starCluster.draw();
+    if (starCluster.offscreen()) {
+      stars.splice(i, 1); // 如果流星簇超出画布，就将其从数组中移除
+    }
+  }
+}
+
+
+
+
+
 function checkLine() {
   for (let i = 0; i < 7; i++) {
     if (checkPoint[i + 1] === true) {
@@ -195,13 +226,13 @@ function brushEffect(px, py, nx, ny, hue) {
     canvas2.stroke(161, 105, 22, a);
   }
   else if (hue == "Summer") {
-    canvas2.stroke(151,230,228, a);
+    canvas2.stroke(151, 230, 228, a);
   }
   else if (hue == "Winter") {
-    canvas2.stroke(7,7,50, a);
+    canvas2.stroke(7, 7, 50, a);
   }
   else if (hue == "Winter_plus") {
-    canvas2.stroke(83,83,95, a);
+    canvas2.stroke(83, 83, 95, a);
   }
 
   canvas2.strokeWeight(brushSize);
@@ -220,7 +251,6 @@ function brushEffect(px, py, nx, ny, hue) {
   canvas2.blendMode(BLEND);
 
 }
-
 
 function seasonExe(season, rgb) {
 
@@ -386,7 +416,7 @@ function cubeEmo(x, y, timer) {
 // 绘制笑脸表情
 function drawSmileyFace(x, y) {
   // 绘制眼睛
-  if (frameCount % 60 < 30) {//眨眼
+  if (frameCount % 180 < 30) {//眨眼
     noFill();
     stroke(178, 72, 15); // HSB
     strokeWeight(2);
@@ -654,3 +684,103 @@ class Expression {
     }
   }
 }
+
+
+class Star {
+  constructor() {
+    this.x = random(-50, 0); // 从画布左侧之外开始
+    this.y = random(height);
+    this.speed = random(3, 6);
+    this.color = color(255);
+    this.trail = [];
+  }
+
+  update() {
+    
+    // 更新流星的位置
+    this.x += this.speed;
+    this.y += map(noise(frameCount * 0.01, this.y * 0.01), 0, 1, -3, 3); // 使用frameCount和y坐标计算噪声，以确保不会往回飞
+
+
+    // 添加当前坐标到尾巴数组中
+    this.trail.push(createVector(this.x, this.y));
+
+    // 限制尾巴长度
+    if (this.trail.length > dotAmount) {
+      this.trail.splice(0, 1);
+    }
+  }
+
+  draw() {
+    // 绘制流星尾巴
+    noFill();
+    stroke(this.color);
+    strokeWeight(2);
+    for (let i = 0; i < this.trail.length; i++) {
+      let pos = this.trail[i];
+      let radius = map(i, 0, this.trail.length - 1, 0, dotRadius);
+      let nextPos = this.trail[i + 1];
+      if (nextPos) {
+        let lerpedPos = p5.Vector.lerp(pos, nextPos, 0.5);
+        ellipse(lerpedPos.x, lerpedPos.y, radius, radius);
+      }
+    }
+
+    // 绘制小白点
+    fill(this.color);
+    ellipse(this.x, this.y, dotRadius, dotRadius);
+  }
+
+  offscreen() {
+    // 判断流星尾部是否超出画布
+    return this.trail[this.trail.length - 1].x > cvs_w + 500;
+  }
+}
+
+class StarCluster {
+  constructor() {
+    this.stars = [];
+    this.x = random(-50, 0); // 从画布左侧之外开始
+    this.y = random(height);
+    this.speed = random(1, 3);
+    this.color = color(255);
+    this.clusterSize = 0; // 簇内流星数量
+  }
+
+  addStars(min, max) {
+    this.clusterSize = floor(random(min, max + 1)); // 随机确定簇内流星数量
+    for (let i = 0; i < this.clusterSize; i++) {
+      let y = this.y + random(-10, 10); // 为每个流星分配不同的y值
+      let star = new Star(this.x, y, this.speed, this.color);
+      this.stars.push(star);
+    }
+  }
+
+  update() {
+    // 更新簇内流星的位置
+    for (let i = 0; i < this.stars.length; i++) {
+      let star = this.stars[i];
+      star.update();
+    }
+  }
+
+  draw() {
+    // 绘制簇内流星
+    for (let i = 0; i < this.stars.length; i++) {
+      let star = this.stars[i];
+      star.draw();
+    }
+  }
+
+  offscreen() {
+    // 判断簇内流星是否超出画布
+    for (let i = 0; i < this.stars.length; i++) {
+      let star = this.stars[i];
+      if (star.trail[star.trail.length - 1].x > cvs_w + 500) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
