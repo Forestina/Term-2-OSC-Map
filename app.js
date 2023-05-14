@@ -2,7 +2,7 @@
  * @Author: Mei Zhang micpearl@163.com
  * @Date: 2023-05-06 01:45:22
  * @LastEditors: Mei Zhang micpearl@163.com
- * @LastEditTime: 2023-05-12 23:19:09
+ * @LastEditTime: 2023-05-14 01:54:50
  * @FilePath: \MY_OSC_SendReceive\app.js
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -24,15 +24,12 @@ let printEveryMessage = true;
 
 //地址：position
 let oscRecievePort = "8002";
+let oscRecievePort2 = "8001";
 let sendIP = "172.16.2.112";//localhost
 let oscSendPort = "8002";
+let oscSendPort2 = "8001";
 
 
-//地址：localEulerAngles
-/*let udpPort2 = new osc.UDPPort({
-  localAddress: "172.16.2.112",
-  localPort: 8001
-});*/
 
 
 // Tell our Node.js Server to host our P5.JS sketch from the public folder.
@@ -72,6 +69,7 @@ io.on("connection", (socket) => {
 
     // Send the data via OSC to another port, device, or software (e.g., Max/MSP)
     udpPort.send({ address: "/position", args: [data.x, data.y, data.z] }, sendIP, oscSendPort);
+    udpPort2.send({ address: "/localEulerAngles", args: [data.x, data.y, data.z] }, sendIP, oscSendPort2);
 
     // Print the data to the console
     if (printEveryMessage) {
@@ -100,8 +98,14 @@ function getIPAddresses() {
 };
 
 let udpPort = new osc.UDPPort({
-  localAddress: "0.0.0.0",
+  localAddress: "172.16.2.112",
   localPort: oscRecievePort
+});
+
+//地址：localEulerAngles
+let udpPort2 = new osc.UDPPort({
+  localAddress: "172.16.2.112",
+  localPort: oscRecievePort2
 });
 
 udpPort.on("ready", () => {
@@ -130,3 +134,31 @@ udpPort.on("error", (err) => {
 });
 
 udpPort.open();
+
+//2
+udpPort2.on("ready", () => {
+  let ipAddresses = getIPAddresses();
+
+  console.log("Listening for OSC over UDP.");
+  ipAddresses.forEach((address) => {
+    console.log(" Host:", address + ", Port:", udpPort.options.localPort);
+  });
+
+});
+
+udpPort2.on("message", (oscMessage) => {
+
+  //send it to the front-end so we can use it with our p5 sketch
+  io.emit("message", oscMessage);
+
+  // Print it to the Console
+  if (printEveryMessage) {
+    console.log(oscMessage);
+  }
+});
+
+udpPort2.on("error", (err) => {
+  console.log(err);
+});
+
+udpPort2.open();

@@ -2,7 +2,7 @@
  * @Author: Mei Zhang micpearl@163.com
  * @Date: 2023-05-06 01:45:22
  * @LastEditors: Mei Zhang micpearl@163.com
- * @LastEditTime: 2023-05-13 16:41:07
+ * @LastEditTime: 2023-05-14 05:20:44
  * @FilePath: \MY_OSC_SendReceive\public\sketch.js
  * @Description: 【PORT 9000】
  */
@@ -18,6 +18,8 @@ let cvs_z = 255; // 画布深度
 //let z = 200;  // 当前z值，初始为0
 let isDrawing = true;  // 是否正在画线的标志
 let brushSize = 30;
+let randomOffset = 10;
+
 
 let recievedMouseX = 0;
 let recievedMouseY = 0;
@@ -39,17 +41,24 @@ let t = 0; // 时间
 
 //涟漪效果
 let ripples = [];
-let posX = [50, 100, 150, 200, 250], posY = [50, 100, 150, 200, 250];
-let offset = 20;
-let checkPoint = [false, false, false, false, false];
+let posX = [75.21, 75.04, 178.73, 283.9, 294.93, 403.27, 501.5];
+let posY = [174.86, 61.04, 228.8, 230.03, 91.4, 312.38, 428.75];
+let offset = 5;
+let checkPoint = [false];
 
 // 方块属性
+let rotationX, rotationY, rotationZ;
+let speedX, speedY, speedZ;
+let currentState = ''; // 当前状态
+let lastStateChangeTime = 0; // 上一次状态切换的时间，单位为毫秒
+let transitionDuration = 2000; // 状态切换的最小持续时间，单位为毫秒
 
-let brushTexture=[];
-
-function preload() {
-  brushTexture[0] = loadImage('antient01.jpg'); 
-}
+//连接线特效
+let x1=posX[0], y1=posY[0]; // 点a的坐标
+const targetX = 60; // 点b的x坐标
+let targetY= (60, cvs_h - 200); // 点b的y坐标
+let t_line = 0; // 参数t用于控制特效动画
+let isAnimating = true; // 控制特效动画的开关
 
 function setup() {
 
@@ -65,33 +74,51 @@ function setup() {
   fill(0);
   text("Send OSC", 10, 20);
 
-  //cube = new Cube(cvs_w / 2, cvs_h / 2); // 初始化正方形对象并置于画布中央
-  //expression = new Expression();
 
 
   // 创建第二个画布
   canvas2 = createGraphics(cvs_w, cvs_h);
   canvas2.position(0, 0);//两个画布的绝对坐标
 
-  canvas2.background(200);
+  canvas2.background(254, 255, 208);//RGB
+  //canvas2.background(220);//RGB
 
   canvas2.fill(0);
   canvas2.text("Recieve OSC", 10, 20);
 
   // 创建图像缓冲区，大小与canvas2相同
   brushBuffer = createGraphics(cvs_w, cvs_h);
-  brushBuffer.background(200);
+  brushBuffer.background(20, 90, 50);
 
 }
 
 
 function draw() {
-  background(0);
+  background(246, 21, 8);//HSB mode
   // 在第一个画布上绘制内容
+  frameRate(10);
 
-  //particleEffect();
-  //rippleEffect();
-  cubeEmo();
+
+  fill(178, 72, 15); // 阴影
+  rect(60, cvs_h - 200, 150, 150); // 左下角正方形
+  fill(178, 72, 70); // 亮蓝色
+  rect(55, cvs_h - 205, 150, 150); // 左下角正方形
+  cubeEmo(60, cvs_h - 200, frameCount);//参数是正方形的位置坐标
+
+  rippleEffect();
+
+  //checkLine();
+
+  // 更新参数t_line，控制特效动画
+  // 更新参数t，控制特效动画
+  if (isAnimating) {
+    t_line += 0.02;
+  }
+  
+
+  // 进行连接两点的特效绘制
+  drawFancyConnection(x1, y1, targetX, targetY, t_line);
+
 
 
   // 在第二个画布上绘制内容
@@ -103,6 +130,64 @@ function draw() {
 
 
 }
+function checkLine() {
+  for (let i = 0; i < 7; i++) {
+    if (checkPoint[i + 1] === true) {
+      drawConnectingLine(posX[i], posY[i]);
+
+      //stroke(47,82,71);
+      //strokeWeight(5);
+      //line(posX[i], posY[i], 60, cvs_h - 200);
+    }
+  }
+}
+function drawConnectingLine(x1, y1) {
+  const targetX = 60; // 点b的x坐标
+  let targetY = cvs_h - 200; // 点b的y坐标 
+  // (60, cvs_h - 200)
+  //t_line
+  // 更新参数t_line，控制特效动画
+  t_line += 0.02;
+
+  // 进行连接两点的特效绘制
+  drawFancyConnection(x1, y1, targetX, targetY, t_line);
+
+  // 绘制点a
+  drawPoint(x1, y1);
+
+  // 绘制点b
+  drawPoint(targetX, targetY);
+
+
+}
+
+// 连接两点的特效绘制函数
+function drawFancyConnection(x1, y1, x2, y2, t) {
+  const numSegments = 100; // 分段数量
+  const segmentLength = dist(x1, y1, x2, y2) / numSegments; // 每个分段的长度
+
+  noFill();
+  beginShape();
+  for (let i = 0; i <= numSegments; i++) {
+    const progress = i / numSegments; // 分段的进度
+
+    // 在每个分段上创建动态的控制点
+    const controlX = lerp(x1, x2, progress) + cos(t + progress * TWO_PI) * 50;
+    const controlY = lerp(y1, y2, progress) + sin(t + progress * TWO_PI) * 50;
+
+    // 添加特效，例如线条透明度和粗细的变化
+    const alpha = map(i, 0, numSegments, 255, 0);
+    const weight = map(i, 0, numSegments, 5, 1);
+
+    stroke(0, alpha);
+    strokeWeight(weight);
+
+    // 绘制连接线的顶点
+    vertex(controlX, controlY);
+  }
+  endShape();
+}
+
 
 function sizeCal(v) {
   var size;
@@ -127,44 +212,55 @@ function brushEffect() {
   // 设置绘制模式
   //canvas2.blendMode(MULTIPLY); // 或者使用 DARKEST
   canvas2.blendMode(DARKEST); // 或者使用 DARKEST
-  // 使用贴图绘制笔刷效果
-  canvas2.image(brushTexture[0], recievedMouseX, recievedMouseY, brushSize, brushSize);
-  // 还原绘制模式
-  canvas2.blendMode(BLEND);
-  
+  //canvas2.blendMode(BLEND);
 
-  // 如果z值超出范围，则抬笔
-  //if (recievedMouseZ < 0 || recievedMouseZ > 255) {
-  // isDrawing = false;
-  //}
-  // 如果正在画线，则绘制
-  //if (isDrawing) {
   // 设置画笔的颜色和透明度，根据z值来调整
-  let a = map(recievedMouseZ, 0, 100, 0, 100);//【改】根据z坐标的实际取值进行map，改第一对0-255
-  //brushBuffer.stroke(140, 160, 23, a);
-  canvas2.stroke(140, 160, 23, a);//(140,160,23)很好看的一个绿色
-  //brushBuffer.stroke(140, 160, 23, a);//(140,160,23)很好看的一个绿色
+  let a = map(recievedMouseZ, 0, 100, 0, 100);
   let s = sizeCal(vilocity(prevMouseX, prevMouseY, recievedMouseX, recievedMouseY));
-  //canvas2.strokeWeight(map(s, 0, 1200, brushSize, brushSize + 25));
+  let brushWeight = map(s, 0, 1200, brushSize, brushSize + 25);
+
   if (s > 0 && s < 100) {
-    canvas2.strokeWeight(map(s, 0, 1200, brushSize, brushSize + 25));
+    canvas2.strokeWeight(brushWeight);
   }
 
+  //绘制笔刷
+  //brushBuffer.stroke(140, 160, 23, a);
+  canvas2.stroke(140, 160, 23, a);//(140,160,23)很好看的一个绿色
   canvas2.strokeWeight(brushSize);
+  canvas2.strokeJoin(ROUND);
+
+  //计算笔刷
+  canvas2.beginShape();
+  canvas2.fill(fillCal("r"), fillCal("g"), fillCal("b"));
+  canvas2.curveVertex(prevMouseX + random(-randomOffset, randomOffset), prevMouseY + random(-randomOffset, randomOffset));
+  canvas2.curveVertex(prevMouseX + random(-randomOffset, randomOffset), prevMouseY + random(-randomOffset, randomOffset));
+  canvas2.curveVertex(recievedMouseX + random(-randomOffset, randomOffset), recievedMouseY + random(-randomOffset, randomOffset));
+  canvas2.curveVertex(recievedMouseX + random(-randomOffset, randomOffset), recievedMouseY + random(-randomOffset, randomOffset));
+  canvas2.endShape();
 
   // 绘制线条
-  canvas2.line(prevMouseX, prevMouseY, recievedMouseX, recievedMouseY);
-  //}
+  //canvas2.line(prevMouseX, prevMouseY, recievedMouseX, recievedMouseY);
+
+  // 还原绘制模式
+  canvas2.blendMode(BLEND);
 
 }
 
+function fillCal(str) {
+  switch (str) {
+    case "r": return random(12, 117);
+    case "g": return random(100, 117);
+    case "b": return random(12, 30);
+  }
+}
+
 //在draw里调用，作为canvas 1（同时也是鼠标控制发送坐标的那个画布）的效果
-function particleEffect() {
+function particleEffect(x, y) {
   //粒子效果
   //background(0);
 
   // 创建新粒子
-  let p = new Particle(recievedMouseX, recievedMouseY, color('hsl(160, 100%, 50%)'));
+  let p = new Particle(x, y, color('hsl(47, 82.19%, 71.69%)'));
   particles.push(p);
 
   // 更新和绘制粒子
@@ -180,20 +276,46 @@ function particleEffect() {
 }
 function rippleEffect() {
   //background(0);
+  for (let i = 0; i < 7; i++) {
+    if ((recievedMouseX >= (posX[i] - offset) && recievedMouseX <= (posX[i] + offset)
+      && recievedMouseY >= (posY[i] - offset) && recievedMouseY <= (posY[i] + offset))
+      || checkPoint[i + 1] == true) {
+      // 在范围内，执行触发操作
+      let ripple = new Ripple(posX[i], posY[i], myColor(i));
+      ripples.push(ripple);
 
-  // 创建新涟漪
-  if ((recievedMouseX >= (posX[1] - offset) && recievedMouseX <= (posX[1] + offset) && recievedMouseY >= (posY[1] - offset) && recievedMouseY <= (posY[1] + offset))
-    || checkPoint[1] == true) {
-    // 在范围内，执行触发操作
-    let ripple = new Ripple(posX[1], posY[1], color('hsl(182, 72%, 63%)'));
-    ripples.push(ripple);
+      rippleEffectExe(ripples);
+      checkPoint[i + 1] = true;
 
-    rippleEffectExe(ripples);
-    checkPoint[1] = true;
-
+    }
   }
-  //console.log("checkPoint[1]==" + checkPoint[1]);
+  // 创建新涟漪
+
+  /*let boolx = recievedMouseX >= (posX[1] - offset) && recievedMouseX <= (posX[1] + offset);
+  let booly = recievedMouseY >= (posY[1] - offset) && recievedMouseY <= (posY[1] + offset)
+  console.log("checkPoint[1]==" + checkPoint[1]);
+  console.log("recievedMouseX==" + recievedMouseX);
+  console.log("recievedMouseY==" + recievedMouseY);
+  console.log("(posY[1] - offset)==" + (posY[1] - offset));
+  console.log(boolx);
+  console.log(booly);*/
+
+
 }
+function myColor(i) {
+  switch (i) {
+    case 0: return color('hsl(270, 38%, 81%)');
+    case 1: return color('hsl(58, 38%, 81%)');
+    case 2: return color('hsl(145, 63%, 22%)');
+    case 3: return color('hsl(75, 72%, 63%)');
+    case 4: return color('hsl(293, 38%, 81%)');
+    case 5: return color('hsl(331, 38%, 81%)');
+    case 6: return color('hsl(185, 38%, 81%)');
+  }
+
+}
+
+
 function rippleEffectExe(ripples) {
 
   // 更新和绘制涟漪
@@ -210,8 +332,101 @@ function rippleEffectExe(ripples) {
 
 }
 
-function cubeEmo() {
+function cubeEmo(x, y, timer) {
+  const currentTime = millis(); // 获取当前时间，单位为毫秒
 
+  // 根据旋转速度判断表情
+  if (speedX > 10 || speedY > 10 || speedZ > 10) {
+    // 旋转速度过快，绘制晕脸（螺旋线）
+    if (currentState !== 'dizzy') {
+      // 如果当前状态不是晕脸状态，则切换到晕脸状态
+      if (currentTime - lastStateChangeTime >= transitionDuration) {
+        currentState = 'dizzy';
+        lastStateChangeTime = currentTime;
+      }
+    }
+  } else {
+    // 旋转速度正常，绘制笑脸（眨眼睛）
+    if (currentState !== 'smiley') {
+      // 如果当前状态不是笑脸状态，则切换到笑脸状态
+      if (currentTime - lastStateChangeTime >= transitionDuration) {
+        currentState = 'smiley';
+        lastStateChangeTime = currentTime;
+      }
+    }
+  }
+
+  // 绘制表情
+  if (currentState === 'dizzy') {
+    push();
+    translate(x + 35, y + 40);
+    rotate(-PI / 6 * timer);
+    drawDizzyFace(x, y);
+    pop();
+
+    push();
+    translate(x + 110, y + 45);
+    rotate(-PI / 6 * timer);
+    drawDizzyFace(x + 35, y + 45);
+    pop();
+
+    particleMouth(x + 35, y + 45);
+  } else if (currentState === 'smiley') {
+    drawSmileyFace(x + 35, y + 45);
+  }
+}
+// 绘制笑脸表情
+function drawSmileyFace(x, y) {
+  // 绘制眼睛
+  if (frameCount % 60 < 30) {//眨眼
+    noFill();
+    stroke(178, 72, 15); // HSB
+    strokeWeight(2);
+
+    arc(x, y, 35, 35, 0, PI);
+    arc(x, y + 2, 35, 35, -0.1, PI + 0.1);
+
+    arc(x + 75, y, 35, 35, 0, PI);
+    arc(x + 75, y + 2, 35, 35, -0.1, PI + 0.1);
+
+    line((x + 150) / 2, y + 50, (x + 150) / 2 + 20, y + 48);
+
+  } else {//睁眼
+
+    fill(255); // 白色
+    stroke(178, 72, 15); // HSB
+    strokeWeight(2);
+    ellipse(x, y, 35, 35); // 左眼
+    ellipse(x + 75, y, 40, 40); // 右眼
+
+    line((x + 150) / 2, y + 50, (x + 150) / 2 + 20, y + 48);
+  }
+
+}
+
+// 绘制晕脸表情（螺旋线）
+function drawDizzyFace(x, y) {
+  let radius = 5;
+  let angle = 0;
+  let angleSpeed = 0.1;
+  let maxRadius = 30;
+  noFill();
+  stroke(178, 72, 15); // HSB
+  strokeWeight(2);
+  beginShape();
+  while (radius <= maxRadius) {
+    let the_x = cos(angle) * radius;
+    let the_y = sin(angle) * radius;
+    vertex(the_x, the_y);
+    angle += angleSpeed;
+    radius += 0.2;
+  }
+  endShape();
+}
+function particleMouth(x, y) {
+  stroke(178, 72, 15); // HSB
+  triangle((x + 150) / 2, y + 50, (x + 150) / 2 + 20, y + 48, (x + 175) / 2, y + 60);
+  particleEffect((x + 150) / 2 + 16, y + 51);
 }
 
 //鼠标发送，测试用
@@ -291,6 +506,25 @@ socket.on("message", (_message) => {
     recievedMouseZ = currentMouseZ;
 
     //console.log("prevMouseX = " + prevMouseX + "; recievedMouseX = " + recievedMouseX);
+  }
+  if (_message.address == "/localEulerAngles") {
+    const rX = _message.args[0];
+    const rY = _message.args[1];
+    const rZ = _message.args[2];
+
+    prX = rotationX;
+    prY = rotationY;
+    prZ = rotationZ;
+
+    rotationX = rX;
+    rotationY = rY;
+    rotationZ = rZ;
+
+    // 计算旋转速度
+    speedX = Math.abs(rotationX - prX);//取绝对值
+    speedY = Math.abs(rotationY - prY);
+    speedZ = Math.abs(rotationZ - prZ);
+
   }
 });
 
